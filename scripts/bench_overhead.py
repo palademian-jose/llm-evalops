@@ -14,6 +14,12 @@ import tempfile
 import time
 from pathlib import Path
 
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8")
+    except (AttributeError, ValueError):
+        pass
+
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT / "src") not in sys.path:
     sys.path.insert(0, str(ROOT / "src"))
@@ -76,6 +82,8 @@ def bench(n: int) -> list[tuple[str, float, float]]:
             ("span, JsonlSink (file, no cross-process lock)",)
             + _time(span_file_nolock, max(200, n // 10))
         )
+        jsonl.sink.close()  # type: ignore[attr-defined]
+        nolock.sink.close()  # type: ignore[attr-defined]
 
     raw = FakeClient()
     msgs = [Message(role="user", content="benchmark prompt " * 20)]

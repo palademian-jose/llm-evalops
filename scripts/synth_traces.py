@@ -24,6 +24,12 @@ from pathlib import Path
 
 import numpy as np
 
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8")
+    except (AttributeError, ValueError):
+        pass
+
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT / "src") not in sys.path:
     sys.path.insert(0, str(ROOT / "src"))
@@ -406,9 +412,9 @@ def write_scenarios(out: Path, n: int, seed: int, *, days: int = 7) -> dict[str,
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--out", default="traces/synthetic")
-    ap.add_argument("--n", type=int, default=2000, help="requests per scenario")
+    ap.add_argument("--n", type=int, default=3000, help="requests per scenario")
     ap.add_argument("--seed", type=int, default=42)
-    ap.add_argument("--days", type=int, default=7)
+    ap.add_argument("--days", type=int, default=3)
     ap.add_argument("--report", default=None, help="write the before/after Markdown table here")
     args = ap.parse_args()
     stats = write_scenarios(Path(args.out), args.n, args.seed, days=args.days)

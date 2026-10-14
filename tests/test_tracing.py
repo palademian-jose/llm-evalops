@@ -214,6 +214,18 @@ def test_pricing_override_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     assert estimate_cost("rerank-v3.5", searches=10) == pytest.approx(0.02)
 
 
+def test_jsonl_sink_per_process_file(tmp_path: Path):
+    import os
+
+    sink = JsonlSink(tmp_path / "spans.jsonl", per_process=True)
+    with Tracer(sink).span("y"):
+        pass
+    sink.close()
+    assert sink.path.name == f"spans-{os.getpid()}.jsonl"
+    assert not (tmp_path / "spans.jsonl.lock").exists()
+    assert [s.name for s in load_spans(tmp_path)] == ["y"]
+
+
 def test_span_set_routes_unknown_keys_to_meta():
     s = Span(name="x").set(model="m", foo=1, meta={"bar": 2})
     assert s.model == "m" and s.meta == {"foo": 1, "bar": 2}
