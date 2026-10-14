@@ -2,9 +2,22 @@
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 import typer
+
+
+def _utf8_stdio() -> None:
+    """Markdown tables use `Δ`; make Windows consoles and pipes handle it."""
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8")  # type: ignore[attr-defined]
+        except (AttributeError, ValueError):
+            pass
+
+
+_utf8_stdio()
 
 app = typer.Typer(
     name="evalkit",
@@ -95,6 +108,73 @@ def calibrate(
     if min_kappa is not None and (math.isnan(rep.kappa) or rep.kappa < min_kappa):
         typer.echo(f"kappa {rep.kappa:.3f} below required {min_kappa}", err=True)
         raise typer.Exit(code=1)
+
+
+@app.command()
+def compare(
+    a: Path = typer.Option(..., "--a", help="Baseline EvalResult JSON."),
+    b: Path = typer.Option(..., "--b", help="Candidate EvalResult JSON."),
+    metrics: str | None = typer.Option(None, help="Comma-separated metrics (default: shared)."),
+    n_boot: int = typer.Option(10_000, help="Bootstrap / permutation resamples."),
+    seed: int = typer.Option(0, help="Random seed for resampling."),
+    md: Path | None = typer.Option(None, "--md", help="Write the Markdown report here."),
+    json_out: Path | None = typer.Option(None, "--json", help="Write per-metric stats as JSON."),
+) -> None:
+    """Per-metric deltas with paired bootstrap CI, permutation and McNemar tests."""
+    import json
+
+    from evalkit.io import load_eval_result
+    from evalkit.stats import compare as run_compare
+    from evalkit.stats import compare_markdown
+
+    ra, rb = load_eval_result(a), load_eval_result(b)
+    names = [m.strip() for m in metrics.split(",")] if metrics else None
+    comps = run_compare(ra, rb, names, n_boot=n_boot, seed=seed)
+    out_md = compare_markdown(comps, label_a=ra.run_id, label_b=rb.run_id, n_boot=n_boot)
+    typer.echo(out_md)
+    _write_md(out_md, md)
+    if json_out:
+        json_out.parent.mkdir(parents=True, exist_ok=True)
+        json_out.write_text(json.dumps([c.as_dict() for c in comps], indent=2), encoding="utf-8")
+
+
+@app.command()
+def gate(
+    candidate: Path = typer.Option(..., "--candidate", help="Candidate EvalResult JSON."),
+    baseline: Path | None = typer.Option(None, "--baseline", help="Baseline EvalResult JSON."),
+    config: Path = typer.Option(Path("evals.yaml"), "--config", help="Gate config YAML."),
+    md: Path | None = typer.Option(None, "--md", help="Write the Markdown table here."),
+    annotate: bool = typer.Option(False, help="Append the table to $GITHUB_STEP_SUMMARY."),
+) -> None:
+    """Fail (exit 1) when the candidate violates min / max_drop thresholds."""
+    from evalkit.gate import evaluate_gate, load_gate_config, write_step_summary
+    from evalkit.io import load_eval_result
+
+    cfg = load_gate_config(config)
+    base = load_eval_result(baseline) if baseline else None
+    rep = evaluate_gate(base, load_eval_result(candidate), cfg)
+    out_md = rep.to_markdown()
+    typer.echo(out_md)
+    _write_md(out_md, md)
+    if annotate:
+        write_step_summary(out_md)
+    if not rep.ok:
+        raise typer.Exit(code=1)
+
+
+@app.command()
+def annotate(
+    md: Path = typer.Option(..., "--md", help="Markdown file to publish."),
+) -> None:
+    """Append a Markdown file to $GITHUB_STEP_SUMMARY (prints it when not on Actions)."""
+    from evalkit.gate import write_step_summary
+
+    text = md.read_text(encoding="utf-8")
+    target = write_step_summary(text)
+    if target is None:
+        typer.echo(text)
+    else:
+        typer.echo(f"appended to {target}", err=True)
 
 
 def main() -> None:
