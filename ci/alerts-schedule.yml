@@ -1,0 +1,36 @@
+# Scheduled alert check. Copy to .github/workflows/ in the repo that owns the traces.
+# Equivalent crontab line for a server that has the traces locally:
+#   0 * * * * cd /srv/app && LLM_PROVIDER=fake uv run llmops check --traces traces/ --rules alerts.yaml --window 1h --baseline-window 24h --notify >> /var/log/llmops-check.log 2>&1
+name: llmops-alerts
+
+on:
+  schedule:
+    - cron: "0 * * * *"   # hourly
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    env:
+      LLM_PROVIDER: fake
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --all-extras
+      - name: Fetch traces (replace with your bucket / volume)
+        run: |
+          mkdir -p traces
+          # aws s3 sync s3://my-bucket/traces/ traces/
+          uv run python scripts/synth_traces.py --out traces/synthetic --n 600 --seed 7
+      - name: Evaluate alert rules
+        run: |
+          uv run llmops check --traces traces/synthetic/baseline --rules alerts.yaml \
+            --window 1h --baseline-window 24h --notify --md reports/alerts.md
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: alert-report
+          path: |
+            reports/alerts.md
+            alerts/

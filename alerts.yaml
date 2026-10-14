@@ -1,0 +1,40 @@
+# `llmops check --traces traces/ --rules alerts.yaml --window 1h --baseline-window 24h`
+# The window is the last `window` of traffic; the baseline is the `baseline_window` before it.
+window: 1h
+baseline_window: 24h
+
+rules:
+  - name: cost-per-request-spike
+    type: cost_spike
+    max_increase_pct: 50          # mean USD per request up by more than 50 %
+    min_samples: 30
+
+  - name: p95-latency-regression
+    type: p95_regression
+    max_increase_pct: 30          # p95 of request latency up by more than 30 %
+    min_samples: 30
+
+  - name: error-rate-jump
+    type: error_rate_jump
+    max_increase_abs: 0.02        # error rate up by more than 2 percentage points
+    min_samples: 30
+
+  - name: output-length-drift
+    type: output_length_drift
+    ks_pvalue_lt: 0.01            # two-sample KS test on output tokens
+    min_shift_pct: 10             # and the median moved by more than 10 %
+    min_samples: 30
+
+  - name: refusal-rate-drift
+    type: refusal_rate_drift
+    max_increase_abs: 0.05        # refusal share up by more than 5 points
+    min_samples: 30
+    # refusal_patterns: ["\\bI can(?:'|no)t\\b", "\\bI(?:'m| am) unable\\b"]
+
+notifiers:
+  - type: stdout
+  # - type: slack
+  #   webhook_url_env: SLACK_WEBHOOK_URL
+  # - type: email
+  #   to: ["oncall@example.com"]
+  #   subject: "[llmops] alert rule violations"

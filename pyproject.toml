@@ -61,6 +61,8 @@ ignore = ["B008"]
 "src/llmops/cost.py" = ["E501"]
 "src/llmops/latency.py" = ["E501"]
 "src/llmops/cache/*" = ["E501"]
+"src/llmops/alerts/*" = ["E501"]
+"src/llmops/cli.py" = ["E501"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

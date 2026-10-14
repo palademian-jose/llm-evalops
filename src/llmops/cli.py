@@ -108,6 +108,77 @@ def cache_stats_cmd(
     _write_md(text, md)
 
 
+@app.command()
+def check(
+    traces: list[str] | None = typer.Option(None, "--traces", help="JSONL files, dirs or globs."),
+    rules: Path = typer.Option(Path("alerts.yaml"), "--rules", help="Alert rules YAML."),
+    window: str | None = typer.Option(None, help="Recent window, e.g. 1h (default from rules)."),
+    baseline_window: str | None = typer.Option(None, help="Baseline window, e.g. 24h."),
+    now: str | None = typer.Option(
+        None, help="ISO timestamp for the window end (default: latest span)."
+    ),
+    notify_: bool = typer.Option(
+        False, "--notify", help="Send violations through the configured notifiers."
+    ),
+    md: Path | None = typer.Option(None, "--md", help="Write the Markdown report here."),
+    record_outcome: str | None = typer.Option(
+        None,
+        "--record-outcome",
+        help="true|false: label the last check's violations (alert precision log).",
+    ),
+    alert_id: str | None = typer.Option(
+        None, help="Only label this alert id when recording an outcome."
+    ),
+    note: str = typer.Option("", help="Free-text note stored with the outcome."),
+) -> None:
+    """Evaluate alert rules (cost spike, p95, error rate, length drift, refusal drift); exit 1 on violations."""
+    from llmops.alerts import outcomes as oc
+
+    if record_outcome is not None:
+        flag = record_outcome.strip().lower() in ("true", "1", "yes", "tp")
+        n = oc.record_outcome(flag, alert_id=alert_id, note=note)
+        typer.echo(f"recorded {n} outcome(s) as {'true' if flag else 'false'} positive")
+        if n:
+            typer.echo(oc.precision_table(oc.load_outcomes()))
+        return
+
+    from llmops.alerts import evaluate_rules, load_alerts_config, result_to_dict
+    from llmops.alerts.notify import notify
+    from llmops.tracing.span import parse_ts
+
+    if not traces:
+        typer.echo("--traces is required (unless --record-outcome)", err=True)
+        raise typer.Exit(code=2)
+    cfg = load_alerts_config(rules)
+    spans = _load(traces)
+    result = evaluate_rules(
+        spans,
+        cfg,
+        now=parse_ts(now) if now else None,
+        window=window,
+        baseline_window=baseline_window,
+    )
+    text = "# Alert check\n\n" + result.to_markdown()
+    outcomes = oc.load_outcomes()
+    if outcomes:
+        text += "\n\n## Alert precision so far\n\n" + oc.precision_table(outcomes)
+    typer.echo(text)
+    _write_md(text, md)
+    oc.save_last_check(result_to_dict(result))
+    if notify_ and result.violations:
+        notify(result, cfg.notifiers)
+    if not result.ok:
+        raise typer.Exit(code=1)
+
+
+@app.command("alert-stats")
+def alert_stats() -> None:
+    """Precision / false-alarm rate of recorded alert outcomes."""
+    from llmops.alerts import outcomes as oc
+
+    typer.echo("# Alert precision\n\n" + oc.precision_table(oc.load_outcomes()))
+
+
 def main() -> None:
     app()
 
