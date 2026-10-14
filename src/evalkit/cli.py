@@ -177,6 +177,56 @@ def annotate(
         typer.echo(f"appended to {target}", err=True)
 
 
+@app.command()
+def run(
+    golden: Path = typer.Option(..., "--golden", help="Golden set JSONL."),
+    target: str = typer.Option(
+        ..., "--target", help="`module:callable` taking (input: dict) -> dict."
+    ),
+    metrics: str = typer.Option(..., "--metrics", help="Comma-separated metric names."),
+    out: Path = typer.Option(Path("reports"), "--out", help="Output directory."),
+    k: int = typer.Option(1, "--k", help="Repeat each case k times (pass^k)."),
+    seed: int = typer.Option(0, help="Base seed injected as `_seed` into the target input."),
+    concurrency: int = typer.Option(1, help="Worker threads."),
+    run_id: str | None = typer.Option(None, help="Run id (default: timestamp)."),
+    verifier: str | None = typer.Option(None, help="`module:callable` (case, output) -> bool."),
+    judge_model: str | None = typer.Option(None, help="Override JUDGE_MODEL for judged metrics."),
+    trace_path: str | None = typer.Option(None, help="Span JSONL path (default TRACE_PATH)."),
+    no_trace: bool = typer.Option(False, "--no-trace", help="Do not write spans to a file."),
+    limit: int | None = typer.Option(None, help="Only run the first N cases."),
+) -> None:
+    """Run a target over a golden set and write reports/eval-<run_id>.json."""
+    from evalkit.io import load_golden, write_eval_result
+    from evalkit.runner import RunConfig, load_callable, run_eval
+
+    cases = load_golden(golden)
+    fn = load_callable(target)
+    cfg = RunConfig(
+        metrics=[m.strip() for m in metrics.split(",") if m.strip()],
+        k=k,
+        seed=seed,
+        concurrency=concurrency,
+        run_id=run_id,
+        verifier=load_callable(verifier) if verifier else None,
+        judge_model=judge_model,
+        trace_path="" if no_trace else trace_path,
+        limit=limit,
+        extra_meta={"golden": str(golden), "target": target},
+    )
+    try:
+        result = run_eval(cases, fn, cfg)
+    except KeyError as e:
+        typer.echo(f"ERROR: {e}", err=True)
+        raise typer.Exit(code=2) from e
+    path = write_eval_result(out / f"eval-{result.run_id}.json", result)
+    typer.echo(f"run_id={result.run_id} cases={len(result.cases)} provider={result.provider}")
+    typer.echo("| Metric | Value |")
+    typer.echo("|---|---|")
+    for name, value in result.metrics.items():
+        typer.echo(f"| {name} | {value:.4g} |")
+    typer.echo(f"wrote {path}", err=True)
+
+
 def main() -> None:
     app()
 

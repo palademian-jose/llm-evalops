@@ -1,0 +1,5 @@
+# Gate thresholds for the agent demo: a single lucky run is not enough, gate on pass^k.
+min_cases: 10
+metrics:
+  task_success: {min: 0.80, max_drop: 0.10}
+  pass_pow_k: {min: 0.80, max_drop: 0.10}
