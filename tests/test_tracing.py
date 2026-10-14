@@ -229,3 +229,24 @@ def test_jsonl_sink_per_process_file(tmp_path: Path):
 def test_span_set_routes_unknown_keys_to_meta():
     s = Span(name="x").set(model="m", foo=1, meta={"bar": 2})
     assert s.model == "m" and s.meta == {"foo": 1, "bar": 2}
+
+
+def test_wrap_client_uses_the_clients_provider_attribute_as_gen_ai_system():
+    class Routed(FakeClient):
+        provider = "openrouter"
+
+    sink = MemorySink()
+    t = Tracer(sink)
+    wrap_client(Routed(), t).complete([Message(role="user", content="hi")])
+    wrap_client(Routed(), t, system="custom").complete([Message(role="user", content="hi")])
+    assert [s.meta["gen_ai.system"] for s in sink.spans] == ["openrouter", "custom"]
+
+
+def test_fake_model_ids_used_by_sibling_repos_are_priced_at_zero():
+    for model in (
+        "fake-model",
+        "fake-extractive-v1",
+        "fake-hashed-bow-256",
+        "fake-lexical-overlap",
+    ):
+        assert estimate_cost(model, 10_000, 10_000) == 0.0, model

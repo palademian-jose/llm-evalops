@@ -26,5 +26,8 @@
   "text-embedding-3-large": {"input_per_m": 0.13, "output_per_m": 0.0},
   "text-embedding-3-small": {"input_per_m": 0.02, "output_per_m": 0.0},
   "rerank-v3.5": {"input_per_m": 0.0, "output_per_m": 0.0, "per_search": 0.002},
-  "fake-model": {"input_per_m": 0.0, "output_per_m": 0.0}
+  "fake-model": {"input_per_m": 0.0, "output_per_m": 0.0},
+  "fake-extractive-v1": {"input_per_m": 0.0, "output_per_m": 0.0},
+  "fake-hashed-bow-256": {"input_per_m": 0.0, "output_per_m": 0.0},
+  "fake-lexical-overlap": {"input_per_m": 0.0, "output_per_m": 0.0}
 }

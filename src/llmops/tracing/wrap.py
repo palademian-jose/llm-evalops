@@ -92,6 +92,10 @@ def record_response(span: Any, resp: LLMResponse, *, system: str | None = None) 
 
 
 def _guess_system(client: Any) -> str:
+    """`gen_ai.system`: the client's `provider` attribute when it has one, else its class name."""
+    provider = getattr(client, "provider", None)
+    if isinstance(provider, str) and provider:
+        return provider
     name = type(client).__name__.lower()
     for key in ("openrouter", "anthropic", "openai", "fake"):
         if key in name:
@@ -105,8 +109,13 @@ def wrap_client(
     *,
     name: str = "llm.complete",
     feature: str | None = None,
+    system: str | None = None,
 ) -> TracedClient:
-    """Return a drop-in client whose `complete` emits an llm span per call."""
+    """Return a drop-in client whose `complete` emits an llm span per call.
+
+    `system` overrides the `gen_ai.system` meta value; by default it is the client's `provider`
+    attribute (when present) or a guess from its class name.
+    """
     if isinstance(client, TracedClient):
         return client
-    return TracedClient(client, tracer, name=name, feature=feature)
+    return TracedClient(client, tracer, name=name, feature=feature, system=system)
