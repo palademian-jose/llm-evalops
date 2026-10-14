@@ -153,7 +153,7 @@ flowchart LR
 ```bash
 uv sync --all-extras            # Python 3.12, pinned via .python-version
 cp .env.example .env            # LLM_PROVIDER=fake works with no keys
-make test                       # 89 tests
+make test                       # 96 tests
 make demo                       # golden set -> runs -> calibrate -> compare -> gate (fails on purpose)
 make synth                      # synthetic traces + reports/before_after.md
 make real-before-after          # same table from ../docs-rag/traces/scenarios (run `make traces` there first)
@@ -454,7 +454,7 @@ examples/         toy RAG + agent targets, golden-set builder, sample bills
 scripts/          demo.py, synth_traces.py (also `--from-dirs`), bench_overhead.py
 ci/               composite action, reusable gate workflow, alerts schedule
 docs/             integration.md
-tests/            89 tests (pytest), all offline
+tests/            96 tests (pytest), all offline
 ```
 
 ## Related projects
