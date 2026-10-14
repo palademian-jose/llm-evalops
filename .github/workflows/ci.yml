@@ -1,0 +1,64 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  LLM_PROVIDER: fake
+  PYTHONIOENCODING: utf-8
+
+jobs:
+  lint-test-demo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Install
+        run: uv sync --all-extras
+
+      - name: Lint
+        run: make lint
+
+      - name: Tests
+        run: make test
+
+      # The demo runs baseline + a deliberately regressed candidate and asserts that the gate
+      # FAILS the regressed candidate (exit 1 inside, exit 0 for the workflow).
+      - name: Demo (golden set -> run -> calibrate -> compare -> gate)
+        run: make demo
+
+      - name: Publish the gate tables to the job summary
+        if: always()
+        run: |
+          uv run evalkit annotate --md reports/gate-rag.md
+          uv run evalkit annotate --md reports/gate-agent.md
+
+      - name: Synthetic traces, before/after table and alert check
+        run: |
+          make synth
+          uv run llmops check --traces traces/synthetic/baseline --rules alerts.yaml \
+            --window 1h --baseline-window 24h --md reports/alerts.md || echo "alert check fired as expected"
+          uv run llmops cost --traces traces/synthetic/baseline --by model \
+            --validate-against traces/synthetic/bill_baseline.csv --md reports/cost.md
+
+      - name: Tracing overhead benchmark
+        run: make bench
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: reports
+          path: reports/
+
+      # Baseline for downstream gates (consumed by ci/eval-gate.yml in sibling repos).
+      - uses: actions/upload-artifact@v4
+        if: github.ref == 'refs/heads/main'
+        with:
+          name: eval-baseline
+          path: reports/eval-rag-baseline.json
