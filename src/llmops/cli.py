@@ -171,6 +171,46 @@ def check(
         raise typer.Exit(code=1)
 
 
+@app.command()
+def dashboard(
+    traces: list[str] = typer.Option(["traces"], "--traces", help="Trace files, dirs or globs."),
+    compare: str | None = typer.Option(
+        None, help="Directory with one sub-directory of traces per scenario."
+    ),
+    rules: str | None = typer.Option(None, help="alerts.yaml for the live alerts panel."),
+    port: int = typer.Option(8501, help="Port for the Streamlit server."),
+    headless: bool = typer.Option(True, help="Run Streamlit headless (no browser auto-open)."),
+) -> None:
+    """Launch the Streamlit dashboard (requires the `dashboard` extra)."""
+    import subprocess
+
+    from llmops.dashboard import APP_PATH
+
+    cmd = [
+        sys.executable,
+        "-m",
+        "streamlit",
+        "run",
+        str(APP_PATH),
+        "--server.headless",
+        "true" if headless else "false",
+        "--server.port",
+        str(port),
+        "--browser.gatherUsageStats",
+        "false",
+        "--",
+        "--traces",
+        *traces,
+    ]
+    if compare:
+        cmd += ["--compare", compare]
+    if rules:
+        cmd += ["--rules", rules]
+    typer.echo(f"streamlit on http://localhost:{port}", err=True)
+    proc = subprocess.run(cmd)
+    raise typer.Exit(code=proc.returncode)
+
+
 @app.command("alert-stats")
 def alert_stats() -> None:
     """Precision / false-alarm rate of recorded alert outcomes."""

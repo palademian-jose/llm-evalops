@@ -228,7 +228,11 @@ def read_bill(path: str | Path) -> tuple[list[BillLine], str]:
     return lines, "simple"
 
 
-def reconcile(spans: list[Span], bill_path: str | Path) -> ReconcileReport:
+def reconcile(
+    spans: list[Span], bill_path: str | Path, *, kinds: tuple[str, ...] = ("llm",)
+) -> ReconcileReport:
+    """Compare computed cost per (day, model) with a bill. Only `kinds` spans count (a provider
+    bill covers its own LLM calls; rerank or embedding vendors are reconciled separately)."""
     bill, fmt = read_bill(bill_path)
     billed: dict[tuple[str, str], list[float]] = defaultdict(lambda: [0.0, 0])
     for b in bill:
@@ -238,7 +242,7 @@ def reconcile(spans: list[Span], bill_path: str | Path) -> ReconcileReport:
     computed: dict[tuple[str, str], list[float]] = defaultdict(lambda: [0.0, 0])
     pricing = load_pricing()
     for s in spans:
-        if not s.model or s.cache_hit:
+        if s.kind not in kinds or not s.model or s.cache_hit:
             continue
         key = (parse_ts(s.start_ts).strftime("%Y-%m-%d"), canonical_model(s.model, pricing))
         acc = computed[key]
