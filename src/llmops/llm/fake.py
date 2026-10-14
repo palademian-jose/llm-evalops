@@ -30,6 +30,7 @@ _TOKEN = re.compile(r"[a-z0-9]+")
 DEFAULT_JUDGE_THRESHOLDS: dict[str, float] = {
     "faithfulness": 0.5,
     "answer_relevance": 0.2,
+    "context_relevance": 0.3,
     "context_precision": 0.5,
     "default": 0.5,
 }
@@ -133,6 +134,8 @@ class FakeClient:
         thr = thresholds.get(criterion, thresholds["default"])
         output = tags.get("output", "")
         reference = tags.get("reference", "")
+        if reference.strip() == "(none)":
+            reference = ""
         inp = tags.get("input", "")
 
         if criterion == "pairwise":
@@ -147,6 +150,9 @@ class FakeClient:
         elif criterion == "answer_relevance":
             score = overlap(inp, output)
             reason = f"{score:.2f} of the question tokens are addressed by the answer"
+        elif criterion == "context_relevance":
+            score = overlap(inp, output)
+            reason = f"{score:.2f} of the question tokens occur in the passage"
         elif criterion == "context_precision":
             ctxs = [c for c in reference.splitlines() if c.strip()]
             hits = [c for c in ctxs if overlap(inp, c) >= 0.3]
