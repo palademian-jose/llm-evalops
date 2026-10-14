@@ -185,8 +185,8 @@ uv run evalkit gate --baseline reports/eval-main.json --candidate reports/eval-p
 uv run llmops check --traces traces/ --rules alerts.yaml --window 1h --baseline-window 24h --notify  # 5. watch prod
 ```
 
-`docs/integration.md` walks `docs-rag` and `briefing-agent` through replacing their local
-`tracing.py` / `gate.py`. `ci/action.yml` (composite action) and `ci/eval-gate.yml` (reusable
+`docs/integration.md` is the wiring guide; `docs-rag` and `briefing-agent` already follow it
+(their local `tracing.py` / `pricing.py` / `gate.py` are gone). `ci/action.yml` (composite action) and `ci/eval-gate.yml` (reusable
 workflow) wrap steps 3 and 4.
 
 ---
@@ -457,5 +457,15 @@ docs/             integration.md
 tests/            89 tests (pytest), all offline
 ```
 
-Related repos: `../docs-rag` (production RAG) and `../briefing-agent` (research agent) consume
-this package; see `docs/integration.md`.
+## Related projects
+
+- [`docs-rag`](../docs-rag) (GitHub: `https://github.com/palademian-jose/docs-rag`): production
+  RAG over a document corpus with citations and refusal. It is instrumented with `llmops.tracing`
+  / `llmops.pricing`, gated in CI by `evalkit gate`, and produced the real before/after table
+  above.
+- [`briefing-agent`](../briefing-agent) (GitHub: `https://github.com/palademian-jose/briefing-agent`):
+  research-briefing agent with tool use, recovery and a verifier. Instrumented and gated the same
+  way, with its judge routed through `evalkit.judge`.
+
+Both depend on this repo as a path dependency (`uv add --editable ../llm-evalops`; git URL form in
+their READMEs and in `docs/integration.md`). See `docs/integration.md` for the wiring.

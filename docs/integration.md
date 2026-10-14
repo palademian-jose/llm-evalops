@@ -21,6 +21,13 @@ Later, from git (no PyPI release needed):
 uv add "llm-evalops @ git+https://github.com/<owner>/llm-evalops.git"
 ```
 
+CI in the consumer: `actions/checkout` cannot write outside `$GITHUB_WORKSPACE`, so check the
+consumer out to `<name>/` and this repo to `llm-evalops/` (`repository: <owner>/llm-evalops`,
+`path: llm-evalops`), set `defaults.run.working-directory: <name>`, and `../llm-evalops`
+resolves. This repo must be public, or pass `token:` with a read-only secret. Docker needs the
+sibling as a named build context (`docker build --build-context llm-evalops=../llm-evalops .`)
+and `uv sync --no-editable`.
+
 Optional extras: `dashboard` (Streamlit), `otel` (OpenTelemetry export), `redis` (exact cache
 backend).
 
@@ -147,3 +154,16 @@ sums `cost_usd` over every span of a trace, so put rolled-up totals in `meta`, n
 - [ ] `evals/golden/*.jsonl` validates with `evalkit validate --strict`.
 - [ ] `evalkit calibrate` kappa >= 0.6 for every judge-backed metric used in `evals.yaml`.
 - [ ] `alerts.yaml` copied and `llmops check` scheduled (see `ci/alerts-schedule.yml`).
+
+## 7. Interface gaps found integrating `docs-rag` and `briefing-agent`
+
+| Gap | Resolution |
+|---|---|
+| Consumers called the provider-billed cost `reported_cost_usd`; `wrap_client` reads `LLMResponse.cost_usd` | Consumers renamed the field to `cost_usd` (matches `llmops.llm.types`) |
+| `wrap_client` guessed `gen_ai.system` from the class name (`OpenAICompatClient` -> `openai` even for OpenRouter) | Uses the client's `provider` attribute first; `system=` overrides |
+| Agents name every call (`agent.act`, `agent.compose`) and add `run_id` / `phase` | `wrap_client(..., name=, meta=)`, one wrapper per call; `response_cost(resp)` exposes the reported-over-computed rule for budget accounting |
+| Root spans repeated their children's `cost_usd`, so `llmops` double-counted | Rolled-up totals go in `meta.total_cost_usd`; only leaf spans carry cost |
+| Consumers' price tables had extra ids (`fake-*`, `per_call` rerank price) | Fake ids added to `llmops/pricing.json` at zero cost; rerank is `per_search`; consumers ship no copy |
+| Gate configs used `max_rise` and `optional: true` | `evals.yaml` uses `max_increase`; `optional` is now an `evalkit` threshold key (status `SKIP`) |
+| Reports stored unmeasured metrics as `null` and per-case `runs` as a list of records | `EvalResult` reads `null` metrics as absent; `CaseResult.runs` accepts `int` or a list |
+| Fake-provider judges differ (`evalkit` fake judge vs each consumer's lexical rubric) | Consumers keep their lexical judge for `LLM_PROVIDER=fake` (committed baselines depend on it) and use `evalkit.judge.Judge` for real providers |
