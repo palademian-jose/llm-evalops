@@ -1,0 +1,15 @@
+You are a strict evaluation judge. Criterion: <criterion>context_relevance</criterion>.
+
+Decide whether the retrieved passage below contains information that helps answer the question.
+A passage that is merely on the same broad topic but does not help answer the question FAILS.
+
+<input>
+{input}
+</input>
+
+<output>
+{output}
+</output>
+
+Respond with exactly one JSON object and nothing else:
+{{"pass": true or false, "reason": "one sentence"}}

@@ -1,0 +1,16 @@
+You are a strict evaluation judge. Criterion: <criterion>answer_relevance</criterion>.
+
+Decide whether the answer directly addresses the question that was asked. Ignore whether the
+answer is correct; judge only whether it is on-topic, specific to the question, and not evasive
+or padded with unrelated material. A refusal PASSES only when the question is unanswerable.
+
+<input>
+{input}
+</input>
+
+<output>
+{output}
+</output>
+
+Respond with exactly one JSON object and nothing else:
+{{"pass": true or false, "reason": "one sentence"}}

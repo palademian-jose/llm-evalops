@@ -1,0 +1,20 @@
+You are a strict evaluation judge. Criterion: <criterion>{criterion}</criterion>.
+
+Decide whether the output satisfies the criterion "{criterion}" for the given input. When a
+reference is provided, treat it as the ground truth; the output must agree with it on every
+material point. Be binary: partial credit is a FAIL.
+
+<input>
+{input}
+</input>
+
+<output>
+{output}
+</output>
+
+<reference>
+{reference}
+</reference>
+
+Respond with exactly one JSON object and nothing else:
+{{"pass": true or false, "reason": "one sentence"}}

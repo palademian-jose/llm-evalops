@@ -1,0 +1,2 @@
+Your previous reply was not a valid JSON object. Reply again with ONLY a JSON object of the form
+{"pass": true or false, "reason": "one sentence"} and no other text, no code fences.

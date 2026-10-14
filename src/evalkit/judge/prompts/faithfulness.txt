@@ -1,0 +1,22 @@
+You are a strict evaluation judge. Criterion: <criterion>faithfulness</criterion>.
+
+Decide whether EVERY factual claim in the answer is supported by the provided context.
+An answer that adds facts not present in the context, contradicts it, or invents numbers,
+names or citations FAILS, even if those facts happen to be true in the real world.
+An answer that says it cannot answer from the context PASSES only if the context indeed
+lacks the information.
+
+<input>
+{input}
+</input>
+
+<output>
+{output}
+</output>
+
+<reference>
+{reference}
+</reference>
+
+Respond with exactly one JSON object and nothing else:
+{{"pass": true or false, "reason": "one sentence naming the supported or unsupported claim"}}
