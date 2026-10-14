@@ -1,0 +1,6 @@
+created_at,model,app,tokens_prompt,tokens_completion,cost_total,provider
+2026-10-01T09:12:03Z,anthropic/claude-sonnet-4.5,llm-evalops,60000,15000,0.405,Anthropic
+2026-10-01T15:40:11Z,anthropic/claude-sonnet-4.5,llm-evalops,60000,15000,0.405,Anthropic
+2026-10-01T16:02:45Z,openai/gpt-4.1-mini,llm-evalops,50000,10000,0.036,OpenAI
+2026-10-02T08:30:00Z,anthropic/claude-sonnet-4.5,llm-evalops,100000,25000,0.675,Anthropic
+2026-10-02T11:11:11Z,openai/gpt-4.1-mini,llm-evalops,40000,8000,0.0288,OpenAI

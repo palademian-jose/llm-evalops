@@ -81,6 +81,23 @@ def normalize_model(model: str, table: dict[str, Price] | None = None) -> str:
     return model.lower().strip()
 
 
+def canonical_model(model: str, table: dict[str, Price] | None = None) -> str:
+    """One display key per model: the OpenRouter slug when the table has one, else the bare key.
+
+    `claude-sonnet-4-5`, `claude-sonnet-4.5` and `anthropic/claude-sonnet-4.5` all map to
+    `anthropic/claude-sonnet-4.5`, so bills and spans reconcile regardless of spelling.
+    """
+    table = table or load_pricing()
+    key = normalize_model(model, table)
+    if "/" in key:
+        return key
+    dashed = key.replace(".", "-")
+    for k in table:
+        if "/" in k and k.split("/", 1)[1].replace(".", "-") == dashed:
+            return k
+    return key
+
+
 def estimate_cost(
     model: str | None,
     input_tokens: int = 0,
