@@ -261,6 +261,9 @@ significant when the CI excludes zero.
 applies `min` / `max_drop` (higher-is-better) and `max` / `max_increase` (lower-is-better) per
 metric plus `min_cases`, prints `| Metric | Baseline | Candidate | Δ | Threshold | Status |`,
 exits 1 on any violation, and appends the table to `$GITHUB_STEP_SUMMARY` when present.
+A metric marked `optional: true` (for example `recovery_rate`, which only exists in runs with
+fault injection) is reported as `SKIP` instead of failing when the candidate did not measure it,
+and is still checked when it did. Metrics a report stores as `null` are read as "not measured".
 `evalkit annotate --md file.md` does the same for any Markdown file.
 
 ---

@@ -1,6 +1,7 @@
 # Gate thresholds consumed by `evalkit gate --config evals.yaml`.
 # Higher-is-better metrics: `min` (absolute floor) and `max_drop` (vs. baseline).
 # Lower-is-better metrics: `max` and `max_increase`.
+# Any metric: `optional: true` skips it (status SKIP) when the candidate did not measure it.
 min_cases: 10
 metrics:
   faithfulness: {min: 0.85, max_drop: 0.05}

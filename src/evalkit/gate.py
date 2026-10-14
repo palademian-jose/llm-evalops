@@ -5,7 +5,8 @@ Per metric:
 - `max_drop`: candidate must not be below baseline by more than max_drop (needs a baseline).
 - `max`: candidate value must be <= max (lower-is-better metrics such as latency or cost).
 - `max_increase`: candidate must not exceed baseline by more than max_increase.
-- A metric listed in the config but missing from the candidate is a violation.
+- A metric listed in the config but missing from the candidate is a violation, unless it is
+  marked `optional: true` (then the row is SKIP and does not fail the gate).
 `min_cases`: the candidate must contain at least this many cases.
 Exit code 1 on any violation. Output is a Markdown table:
 | Metric | Baseline | Candidate | Δ | Threshold | Status |
@@ -30,7 +31,7 @@ class GateRow:
     baseline: float | None
     candidate: float | None
     threshold: str
-    status: str  # PASS | FAIL | WARN
+    status: str  # PASS | FAIL | WARN | SKIP
     reason: str = ""
 
     @property
@@ -87,6 +88,8 @@ def _describe(t: MetricThreshold) -> str:
         parts.append(f"max {t.max:g}")
     if t.max_increase is not None:
         parts.append(f"max_increase {t.max_increase:g}")
+    if t.optional:
+        parts.append("optional")
     return ", ".join(parts) or "—"
 
 
@@ -122,7 +125,10 @@ def evaluate_gate(
             metric=name, baseline=base, candidate=cand, threshold=_describe(t), status="PASS"
         )
         reasons: list[str] = []
-        if cand is None:
+        if cand is None and t.optional:
+            row.status = "SKIP"
+            reasons.append("not measured in this run")
+        elif cand is None:
             row.status = "FAIL"
             reasons.append("metric missing in candidate")
         else:

@@ -186,3 +186,23 @@ def test_gate_cli_via_subprocess(tmp_path: Path, env: dict[str, str]):
     assert proc.returncode == 1
     assert "| Metric | Baseline | Candidate |" in proc.stdout
     assert json.loads(pa.read_text())["run_id"] == "main"
+
+
+def test_optional_metric_is_skipped_when_unmeasured_but_still_checked_when_present():
+    cfg = GateConfig.model_validate({"metrics": {"recovery": {"min": 0.7, "optional": True}}})
+    base = EvalResult(run_id="b", metrics={"recovery": 0.9})
+    skipped = evaluate_gate(base, EvalResult(run_id="c", metrics={}), cfg)
+    assert skipped.ok and skipped.rows[0].status == "SKIP"
+    assert "SKIP — not measured in this run" in skipped.to_markdown()
+    assert "optional" in skipped.rows[0].threshold
+    low = evaluate_gate(base, EvalResult(run_id="c", metrics={"recovery": 0.5}), cfg)
+    assert not low.ok and low.rows[0].status == "FAIL"
+    required = GateConfig.model_validate({"metrics": {"recovery": {"min": 0.7}}})
+    assert not evaluate_gate(base, EvalResult(run_id="c", metrics={}), required).ok
+
+
+def test_eval_result_treats_null_metrics_as_unmeasured():
+    r = EvalResult.model_validate(
+        {"run_id": "r", "metrics": {"task_success": 0.9, "recovery_rate": None, "k": 3}}
+    )
+    assert r.metrics == {"task_success": 0.9, "k": 3.0}

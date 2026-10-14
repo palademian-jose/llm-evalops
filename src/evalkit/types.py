@@ -59,6 +59,15 @@ class EvalResult(BaseModel):
     cases: list[CaseResult] = Field(default_factory=list)
     meta: dict[str, Any] = Field(default_factory=dict)
 
+    @field_validator("metrics", mode="before")
+    @classmethod
+    def _drop_unmeasured(cls, v: Any) -> Any:
+        """A metric reported as null was not measured in this run (for example a recovery rate
+        in a run without fault injection); treat it as absent so older reports still load."""
+        if isinstance(v, dict):
+            return {k: x for k, x in v.items() if x is not None}
+        return v
+
     def case_scores(self, metric: str) -> dict[str, Score]:
         return {c.id: c.scores.get(metric) for c in self.cases}
 
@@ -69,6 +78,8 @@ class MetricThreshold(BaseModel):
     Higher-is-better metrics use `min` (absolute floor on the candidate) and `max_drop`
     (candidate may not fall more than this below the baseline).
     Lower-is-better metrics (latency, cost) use `max` and `max_increase`.
+    `optional: true` skips the metric (status SKIP) when the candidate did not measure it,
+    instead of failing the gate on a missing metric.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -77,6 +88,7 @@ class MetricThreshold(BaseModel):
     max_drop: float | None = None
     max: float | None = None
     max_increase: float | None = None
+    optional: bool = False
 
 
 class GateConfig(BaseModel):
