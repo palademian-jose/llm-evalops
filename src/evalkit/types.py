@@ -42,7 +42,9 @@ class CaseResult(BaseModel):
     cost_usd: float = 0.0
     output: dict[str, Any] | None = None
     error: str | None = None
-    runs: int = 1
+    # Number of repeats of this case (evalkit's runner), or the per-repeat records themselves
+    # (briefing-agent stores one dict per run); the gate reads neither.
+    runs: int | list[dict[str, Any]] = 1
 
 
 class EvalResult(BaseModel):

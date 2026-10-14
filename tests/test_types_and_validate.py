@@ -144,3 +144,11 @@ def test_validate_cli_exit_codes(tmp_path: Path):
     )
     assert runner.invoke(app, ["validate", str(leaky)]).exit_code == 0
     assert runner.invoke(app, ["validate", str(leaky), "--strict"]).exit_code == 1
+
+
+def test_case_result_runs_accepts_a_count_or_per_run_records():
+    from evalkit.types import CaseResult
+
+    assert CaseResult(id="a", runs=3).runs == 3
+    detailed = CaseResult.model_validate({"id": "b", "runs": [{"run_id": "r1", "passed": True}]})
+    assert detailed.runs == [{"run_id": "r1", "passed": True}]
