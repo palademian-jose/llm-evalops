@@ -120,12 +120,24 @@ The judge model is `JUDGE_MODEL` (default `openai/gpt-4.1-mini`), which must be 
 family than `LLM_MODEL`; `evalkit calibrate --strict-family` enforces it. Calibrate against
 `evals/human_labels.jsonl` before trusting a judge-backed metric in a gate.
 
-## 5. Dashboard across repos
+## 5. Dashboard and before/after across repos
 
 `llmops dashboard --traces ../docs-rag/traces ../briefing-agent/traces --compare traces/before-after`
-reads any number of trace sources. For P1's caching work, write the "before" and "after" traces
-to two directories and pass their parent as `--compare` to get the $/1k-requests, p95 and cache
-hit-rate table.
+reads any number of trace sources. For P1's caching work, write one directory of spans per
+serving configuration (`docs-rag/scripts/trace_scenarios.py` does this: `baseline`, `exact_cache`,
+`semantic_cache`, `cheaper_model` under `traces/scenarios/`) and build the $/1k-requests, p95 and
+cache hit-rate table with
+
+```bash
+uv run llmops before-after --dirs '../docs-rag/traces/scenarios/*' --md reports/before_after_docs_rag.md
+```
+
+`--dirs` (and the dashboard's `--compare`) accept a scenario directory, a parent directory with
+one sub-directory per scenario, a `.jsonl` file, or a quoted glob; the scenario called `baseline`
+is the reference for the delta columns (`--baseline NAME` overrides). The same code backs
+`scripts/synth_traces.py --from-dirs`. Roots must not repeat their children's cost: `llmops`
+sums `cost_usd` over every span of a trace, so put rolled-up totals in `meta`, not in the root's
+`cost_usd`.
 
 ## 6. Checklist
 

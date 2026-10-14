@@ -10,6 +10,11 @@ Scenarios (same request stream, different serving strategy):
 
 Writes `<out>/<scenario>/spans.jsonl`, `<out>/bill_baseline.csv` (a simulated provider bill with
 a small rounding discrepancy) and, with --report, a Markdown before/after table.
+
+With `--from-dirs DIR...` nothing is generated: the same table is built from existing scenario
+trace directories instead (for example the REAL docs-rag traces:
+`--from-dirs ../docs-rag/traces/scenarios/* --report reports/before_after_docs_rag.md`), via the
+code `llmops before-after` and the dashboard use.
 """
 
 from __future__ import annotations
@@ -416,7 +421,34 @@ def main() -> None:
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--days", type=int, default=3)
     ap.add_argument("--report", default=None, help="write the before/after Markdown table here")
+    ap.add_argument(
+        "--from-dirs",
+        nargs="+",
+        default=None,
+        metavar="DIR",
+        help="build the table from existing scenario trace directories instead of generating",
+    )
+    ap.add_argument("--title", default=None, help="report heading (with --from-dirs)")
+    ap.add_argument("--note", default=None, help="caveat under the heading (with --from-dirs)")
     args = ap.parse_args()
+    if args.from_dirs:
+        from llmops.compare import compare_scenarios, report
+
+        rows = compare_scenarios(args.from_dirs)
+        if not rows:
+            raise SystemExit(f"no spans found in {args.from_dirs}")
+        md = report(
+            rows,
+            title=args.title or "Before/after: serving strategies",
+            note=args.note,
+        )
+        print(md)
+        if args.report:
+            p = Path(args.report)
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_text(md + "\n", encoding="utf-8")
+            print(f"wrote {p}")
+        return
     stats = write_scenarios(Path(args.out), args.n, args.seed, days=args.days)
     md = before_after_markdown(stats)
     print(md)

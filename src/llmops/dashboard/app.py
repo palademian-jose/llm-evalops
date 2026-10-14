@@ -1,6 +1,6 @@
 """Streamlit dashboard over llmops trace files.
 
-Run with `llmops dashboard --traces traces/ [--compare traces/synthetic] [--rules alerts.yaml]`
+Run with `llmops dashboard --traces traces/ [--compare traces/synthetic ...] [--rules alerts.yaml]`
 or directly: `streamlit run src/llmops/dashboard/app.py -- --traces traces/`.
 Environment fallbacks (used by tests): LLMOPS_DASH_TRACES, LLMOPS_DASH_COMPARE, LLMOPS_DASH_RULES.
 """
@@ -17,6 +17,7 @@ import streamlit as st
 
 from llmops.alerts.rules import evaluate_rules, load_alerts_config
 from llmops.cache.stats import cache_stats, overall_hit_rate
+from llmops.compare import deltas, resolve_scenarios, scenario_stats
 from llmops.cost import cost_table
 from llmops.ingest import load_spans
 from llmops.latency import latency_table
@@ -26,13 +27,14 @@ from llmops.tracing.span import Span
 def _args() -> argparse.Namespace:
     ap = argparse.ArgumentParser(add_help=False)
     ap.add_argument("--traces", nargs="*", default=None)
-    ap.add_argument("--compare", default=None)
+    ap.add_argument("--compare", nargs="*", default=None)
     ap.add_argument("--rules", default=None)
     ns, _ = ap.parse_known_args(sys.argv[1:])
     if not ns.traces:
         env = os.environ.get("LLMOPS_DASH_TRACES")
         ns.traces = env.split(os.pathsep) if env else ["traces"]
-    ns.compare = ns.compare or os.environ.get("LLMOPS_DASH_COMPARE")
+    env_compare = os.environ.get("LLMOPS_DASH_COMPARE")
+    ns.compare = ns.compare or (env_compare.split(os.pathsep) if env_compare else None)
     ns.rules = (
         ns.rules
         or os.environ.get("LLMOPS_DASH_RULES")
@@ -182,42 +184,35 @@ def section_alerts(spans: list[Span], rules: str | None) -> None:
     st.dataframe(pd.DataFrame([r.__dict__ for r in res.rows]), use_container_width=True)
 
 
-def section_compare(compare: str | None) -> None:
+def section_compare(compare: list[str] | None) -> None:
+    """Before / after across scenario trace directories (see `llmops.compare`)."""
     st.header("Before / after")
-    dirs: list[Path] = []
-    if compare and Path(compare).is_dir():
-        dirs = sorted(p for p in Path(compare).iterdir() if p.is_dir() and list(p.glob("*.jsonl")))
-    a = st.text_input("Trace directory A (before)", str(dirs[0]) if dirs else "")
-    b = st.text_input("Trace directory B (after)", str(dirs[-1]) if dirs else "")
-    rows = []
-    for p in dirs or [Path(x) for x in (a, b) if x]:
-        spans = _load((str(p),))
-        if not spans:
-            continue
-        df = to_frame(spans)
-        roots = df[df["root"]]
-        n = max(1, len(roots))
-        rows.append(
-            {
-                "scenario": p.name,
-                "requests": len(roots),
-                "$/1k req": round(df["cost_usd"].sum() / n * 1000, 2),
-                "p50 ms": round(roots["latency_ms"].quantile(0.5), 0),
-                "p95 ms": round(roots["latency_ms"].quantile(0.95), 0),
-                "cache hit rate": round(overall_hit_rate(spans), 3),
-                "error rate": round((roots["status"] == "error").mean(), 3),
-            }
-        )
+    sources = [c for c in (compare or []) if c]
+    resolved = resolve_scenarios(sources)
+    if not resolved:
+        a = st.text_input("Trace directory A (before)", "")
+        b = st.text_input("Trace directory B (after)", "")
+        resolved = resolve_scenarios([x for x in (a, b) if x])
+    rows = [scenario_stats(name, _load(tuple(str(f) for f in files))) for name, files in resolved]
+    rows = [r for r in rows if r.requests]
     if not rows:
-        st.info("Point --compare at a directory with one sub-directory of traces per scenario.")
+        st.info("Point --compare at scenario trace directories (one directory per scenario).")
         return
-    table = pd.DataFrame(rows)
-    base = table.iloc[0]
-    table["Δ cost"] = ((table["$/1k req"] - base["$/1k req"]) / base["$/1k req"]).map(
-        lambda x: f"{x:+.0%}"
-    )
-    table["Δ p95"] = ((table["p95 ms"] - base["p95 ms"]) / base["p95 ms"]).map(
-        lambda x: f"{x:+.0%}"
+    table = pd.DataFrame(
+        [
+            {
+                "scenario": r.scenario,
+                "requests": r.requests,
+                "$/1k req": round(r.usd_per_1k, 2),
+                "Δ cost": f"{d_cost:+.0f}%",
+                "p50 ms": round(r.p50_ms, 0),
+                "p95 ms": round(r.p95_ms, 0),
+                "Δ p95": f"{d_p95:+.0f}%",
+                "cache hit rate": round(r.cache_hit_rate, 3),
+                "error rate": round(r.error_rate, 3),
+            }
+            for r, d_cost, d_p95 in deltas(rows)
+        ]
     )
     st.dataframe(table, use_container_width=True, hide_index=True)
 

@@ -7,7 +7,7 @@ One Python distribution, two packages, two CLIs:
 | Package | What it is | CLI |
 |---|---|---|
 | `evalkit` | Golden sets from error analysis, a calibrated cross-family LLM judge, paired A/B statistics, and a CI gate that fails the build on regression | `evalkit validate / run / calibrate / compare / gate / annotate` |
-| `llmops` | Tracing (JSONL + OpenTelemetry GenAI attributes), cost attribution and bill reconciliation, latency percentiles, exact + semantic caching, alert rules with drift tests, a Streamlit dashboard | `llmops cost / latency / cache-stats / check / alert-stats / dashboard` |
+| `llmops` | Tracing (JSONL + OpenTelemetry GenAI attributes), cost attribution and bill reconciliation, latency percentiles, exact + semantic caching, alert rules with drift tests, a Streamlit dashboard | `llmops cost / latency / cache-stats / check / alert-stats / before-after / dashboard` |
 
 Everything in this README was produced by scripts in this repo (`make demo`, `make synth`,
 `make bench`) with `LLM_PROVIDER=fake`. The fake provider is deterministic, so the numbers
@@ -78,6 +78,36 @@ The baseline set carries an incident in its last hour; `llmops check` catches it
 | output-length-drift | output_length_drift | 192 (1410) | 186 (72) | -6 | KS p < 0.01 and median shift > 10% | OK — KS stat 0.106, p=0.401 |
 | refusal-rate-drift | refusal_rate_drift | 0.01915 (1410) | 0.04167 (72) | +0.02252 | +0.05 abs | OK — +117.6% |
 
+### The same view over real `docs-rag` traces (fake provider, projected cost)
+
+The table above is generated. This one is not: `docs-rag`'s `scripts/trace_scenarios.py` replays
+its 222-question golden set through the actual RAG pipeline (retrieve, rerank, generate, cite)
+under four configurations, all serving the **same 666-request stream** (the questions, the same
+questions again, then lightly reworded versions), and writes each run's spans, through
+`llmops.tracing`, to `docs-rag/traces/scenarios/<scenario>/`. `llmops before-after` builds the
+table (`make real-before-after`, or `llmops before-after --dirs '../docs-rag/traces/scenarios/*'`):
+
+| Scenario | requests | $/1k req | Δ cost | p50 ms | p95 ms | Δ p95 | cache hit rate | error rate |
+|---|---|---|---|---|---|---|---|---|
+| baseline | 666 | 5.60 | +0% | 9 | 15 | +0% | 0% | 0.0% |
+| exact_cache | 666 | 3.71 | -34% | 10 | 16 | +5% | 34% | 0.0% |
+| semantic_cache | 666 | 2.47 | -56% | 3 | 18 | +17% | 56% | 0.0% |
+| cheaper_model | 666 | 1.41 | -75% | 3 | 18 | +20% | 56% | 0.0% |
+
+**Label: fake provider, projected cost.** The retrieval, reranking, caching and tracing code is
+real; the LLM is the deterministic fake, which has no latency and no bill. So `$/1k req` is
+*projected* (the observed token counts priced at list price: `anthropic/claude-sonnet-4.5`,
+`anthropic/claude-haiku-4.5` for `cheaper_model`, reranker billed as `rerank-v3.5`), and
+`p50/p95` are pipeline compute only. With a zero-latency LLM a cache lookup can only add time to a
+miss, which is why p95 *rises* here; against a real model a hit saves seconds. Hit rates are set by
+the replay design (a third of the stream is verbatim repeats), not by real traffic. The semantic
+layer is `llmops.cache.SemanticCache` with the offline hashed bag-of-words embedder at threshold
+0.92: it served 147 of the 222 rewordings (no cross-question false hit in the 222 originals), and
+the script's audit found 8 of those 147 answers differing from the uncached pipeline's answer
+for the same reworded question, which is the correctness risk this layer buys its savings with.
+The synthetic table keeps CI independent of the sibling repo; this one needs `docs-rag` next to
+this repo (`make -C ../docs-rag traces`).
+
 ---
 
 ## Architecture
@@ -123,9 +153,10 @@ flowchart LR
 ```bash
 uv sync --all-extras            # Python 3.12, pinned via .python-version
 cp .env.example .env            # LLM_PROVIDER=fake works with no keys
-make test                       # 78 tests
+make test                       # 89 tests
 make demo                       # golden set -> runs -> calibrate -> compare -> gate (fails on purpose)
 make synth                      # synthetic traces + reports/before_after.md
+make real-before-after          # same table from ../docs-rag/traces/scenarios (run `make traces` there first)
 make dashboard                  # http://localhost:8501
 make bench                      # reports/overhead.md
 ```
@@ -311,7 +342,10 @@ and false-alarm rate per rule, which is what thresholds should be tuned against.
 `llmops dashboard --traces traces/ --compare traces/synthetic --rules alerts.yaml` serves a
 Streamlit app with cost over time, p50/p95 over time, cache hit rate, top-cost features, error
 rate, a live alerts panel and the before/after table across any number of trace directories.
-`make dashboard` runs it on the synthetic sets.
+`--compare` takes scenario directories, a parent holding one sub-directory per scenario, or globs
+(repeat the option), so `--compare '../docs-rag/traces/scenarios/*'` shows the real docs-rag
+table. `make dashboard` runs it on the synthetic sets; `llmops before-after` prints or writes the
+same table without Streamlit (`--md`, `--json`, `--baseline`, `--title`, `--note`).
 
 ### Tracing overhead
 
@@ -412,12 +446,12 @@ app-level features, which is why those live under `llmops.*` attributes.
 ```
 src/evalkit/      types, io, validate, metrics/, judge/ (prompts/), stats, gate, runner, cli
 src/llmops/       settings, llm/ (fake, openrouter, anthropic, openai), pricing.json, tracing/,
-                  cost, latency, cache/, alerts/, dashboard/, ingest, cli
+                  cost, latency, compare, cache/, alerts/, dashboard/, ingest, cli
 examples/         toy RAG + agent targets, golden-set builder, sample bills
-scripts/          demo.py, synth_traces.py, bench_overhead.py
+scripts/          demo.py, synth_traces.py (also `--from-dirs`), bench_overhead.py
 ci/               composite action, reusable gate workflow, alerts schedule
 docs/             integration.md
-tests/            78 tests (pytest), all offline
+tests/            89 tests (pytest), all offline
 ```
 
 Related repos: `../docs-rag` (production RAG) and `../briefing-agent` (research agent) consume

@@ -171,11 +171,59 @@ def check(
         raise typer.Exit(code=1)
 
 
+@app.command("before-after")
+def before_after(
+    paths: list[str] = typer.Argument(
+        None, help="More trace directories (what a shell glob expands to after --dirs)."
+    ),
+    dirs: list[str] = typer.Option(
+        None,
+        "--dirs",
+        help="Scenario trace directories, a parent directory of them, or a quoted glob "
+        "(`--dirs '../docs-rag/traces/scenarios/*'`). A shell-expanded glob also works.",
+    ),
+    baseline: str | None = typer.Option(
+        None, help="Scenario to compute deltas against (default: `baseline`, else the first)."
+    ),
+    title: str = typer.Option("Before/after: serving strategies", help="Report heading."),
+    note: str | None = typer.Option(
+        None, help="Caveat printed under the heading, e.g. `fake provider, projected cost`."
+    ),
+    md: Path | None = typer.Option(None, "--md", help="Write the Markdown report here."),
+    json_out: Path | None = typer.Option(None, "--json", help="Write per-scenario stats here."),
+) -> None:
+    """$/1k requests, p50/p95, cache hit rate and error rate per scenario directory, with deltas."""
+    import json
+
+    from llmops.compare import compare_scenarios, report
+
+    sources = [*(dirs or []), *(paths or [])]
+    if not sources:
+        typer.echo("pass scenario trace directories with --dirs (or as arguments)", err=True)
+        raise typer.Exit(code=2)
+    rows = compare_scenarios(sources)
+    if not rows:
+        typer.echo(f"no spans found in {sources}", err=True)
+        raise typer.Exit(code=2)
+    try:
+        text = report(rows, title=title, note=note, baseline=baseline)
+    except ValueError as e:
+        typer.echo(f"ERROR: {e}", err=True)
+        raise typer.Exit(code=2) from e
+    typer.echo(text)
+    _write_md(text, md)
+    if json_out:
+        json_out.parent.mkdir(parents=True, exist_ok=True)
+        json_out.write_text(json.dumps([r.as_dict() for r in rows], indent=2), encoding="utf-8")
+
+
 @app.command()
 def dashboard(
     traces: list[str] = typer.Option(["traces"], "--traces", help="Trace files, dirs or globs."),
-    compare: str | None = typer.Option(
-        None, help="Directory with one sub-directory of traces per scenario."
+    compare: list[str] = typer.Option(
+        None,
+        help="Scenario trace directories, a directory with one sub-directory of traces per "
+        "scenario, or a glob of them (repeat the option for several).",
     ),
     rules: str | None = typer.Option(None, help="alerts.yaml for the live alerts panel."),
     port: int = typer.Option(8501, help="Port for the Streamlit server."),
@@ -203,7 +251,7 @@ def dashboard(
         *traces,
     ]
     if compare:
-        cmd += ["--compare", compare]
+        cmd += ["--compare", *compare]
     if rules:
         cmd += ["--rules", rules]
     typer.echo(f"streamlit on http://localhost:{port}", err=True)
