@@ -1,0 +1,15 @@
+{
+  "_note": "Public list prices in USD per 1M tokens (or per search) as published by the providers. Verify against the provider pricing pages before relying on these numbers; override with PRICING_PATH.",
+  "_updated": "2026-10",
+  "claude-sonnet-4-5": {"input_per_m": 3.0, "output_per_m": 15.0},
+  "claude-haiku-4-5": {"input_per_m": 1.0, "output_per_m": 5.0},
+  "claude-opus-4-1": {"input_per_m": 15.0, "output_per_m": 75.0},
+  "gpt-4o": {"input_per_m": 2.5, "output_per_m": 10.0},
+  "gpt-4o-mini": {"input_per_m": 0.15, "output_per_m": 0.6},
+  "gpt-4.1": {"input_per_m": 2.0, "output_per_m": 8.0},
+  "gpt-4.1-mini": {"input_per_m": 0.4, "output_per_m": 1.6},
+  "text-embedding-3-large": {"input_per_m": 0.13, "output_per_m": 0.0},
+  "text-embedding-3-small": {"input_per_m": 0.02, "output_per_m": 0.0},
+  "rerank-v3.5": {"input_per_m": 0.0, "output_per_m": 0.0, "per_search": 0.002},
+  "fake-model": {"input_per_m": 0.0, "output_per_m": 0.0}
+}

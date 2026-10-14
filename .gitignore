@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.pytest_cache/
+.ruff_cache/
+build/
+dist/
+
+# Config and secrets
+.env
+
+# Generated at runtime
+traces/
+reports/
+alerts/
+evals/golden/*.jsonl
+!examples/**
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
