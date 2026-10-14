@@ -24,12 +24,14 @@ class TracedClient:
         name: str = "llm.complete",
         feature: str | None = None,
         system: str | None = None,
+        meta: dict[str, Any] | None = None,
     ):
         self._client = client
         self._tracer = tracer
         self._name = name
         self._feature = feature
         self._system = system
+        self._meta = dict(meta or {})
 
     @property
     def inner(self) -> LLMClient:
@@ -56,7 +58,16 @@ class TracedClient:
                 messages, tools=tools, model=model, temperature=temperature, max_tokens=max_tokens
             )
             record_response(span, resp, system=self._system or _guess_system(self._client))
+            span.meta.update(self._meta)
             return resp
+
+
+def response_cost(resp: LLMResponse) -> float:
+    """USD for one response by the rule `record_response` applies: the provider-reported cost
+    when there is one, else tokens x `pricing.json`, else 0 (unknown model)."""
+    if resp.cost_usd is not None:
+        return float(resp.cost_usd)
+    return estimate_cost(resp.model, resp.usage.input_tokens, resp.usage.output_tokens) or 0.0
 
 
 def record_response(span: Any, resp: LLMResponse, *, system: str | None = None) -> None:
@@ -110,12 +121,15 @@ def wrap_client(
     name: str = "llm.complete",
     feature: str | None = None,
     system: str | None = None,
+    meta: dict[str, Any] | None = None,
 ) -> TracedClient:
     """Return a drop-in client whose `complete` emits an llm span per call.
 
     `system` overrides the `gen_ai.system` meta value; by default it is the client's `provider`
-    attribute (when present) or a guess from its class name.
+    attribute (when present) or a guess from its class name. `meta` is merged into every span's
+    `meta` (for example `{"run_id": ...}`); build one wrapper per call when the name or meta
+    changes between calls.
     """
     if isinstance(client, TracedClient):
         return client
-    return TracedClient(client, tracer, name=name, feature=feature, system=system)
+    return TracedClient(client, tracer, name=name, feature=feature, system=system, meta=meta)

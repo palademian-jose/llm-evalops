@@ -250,3 +250,27 @@ def test_fake_model_ids_used_by_sibling_repos_are_priced_at_zero():
         "fake-lexical-overlap",
     ):
         assert estimate_cost(model, 10_000, 10_000) == 0.0, model
+
+
+def test_wrap_client_merges_per_wrapper_meta_and_response_cost_matches_the_span():
+    from llmops.llm.types import LLMResponse, Usage
+    from llmops.tracing import response_cost
+
+    class Reporting(FakeClient):
+        def complete(self, messages, **kw):
+            return LLMResponse(
+                text="x", usage=Usage(input_tokens=1000, output_tokens=100), model="openai/gpt-4o",
+                cost_usd=0.0042,
+            )  # fmt: skip
+
+    sink = MemorySink()
+    t = Tracer(sink)
+    resp = wrap_client(Reporting(), t, name="agent.act", meta={"run_id": "r1", "phase": "discover"})
+    out = resp.complete([Message(role="user", content="hi")])
+    (s,) = sink.spans
+    assert s.name == "agent.act" and s.meta["run_id"] == "r1" and s.meta["phase"] == "discover"
+    assert s.cost_usd == response_cost(out) == 0.0042 and s.meta["cost_source"] == "reported"
+    out.cost_usd = None
+    assert response_cost(out) == estimate_cost("openai/gpt-4o", 1000, 100)
+    out.model = "mystery/model"
+    assert response_cost(out) == 0.0

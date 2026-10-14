@@ -3,7 +3,7 @@
 from llmops.tracing.sink import JsonlSink, MemorySink, MultiSink, NullSink
 from llmops.tracing.span import SPAN_KINDS, Span, format_ts, parse_ts
 from llmops.tracing.tracer import Tracer, get_tracer, null_tracer, set_tracer, span, trace
-from llmops.tracing.wrap import TracedClient, record_response, wrap_client
+from llmops.tracing.wrap import TracedClient, record_response, response_cost, wrap_client
 
 __all__ = [
     "SPAN_KINDS",
@@ -19,6 +19,7 @@ __all__ = [
     "null_tracer",
     "parse_ts",
     "record_response",
+    "response_cost",
     "set_tracer",
     "span",
     "trace",
