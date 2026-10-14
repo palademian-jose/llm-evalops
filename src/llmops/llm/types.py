@@ -49,6 +49,8 @@ class LLMResponse(BaseModel):
     model: str
     latency_ms: float = 0.0
     stop_reason: str = "end_turn"
+    # Provider-reported cost (OpenRouter `usage.cost`); None when the provider does not report it.
+    cost_usd: float | None = None
 
 
 @runtime_checkable
@@ -64,11 +66,31 @@ class LLMClient(Protocol):
     ) -> LLMResponse: ...
 
 
+_VENDOR_ALIASES = {
+    "anthropic": "anthropic",
+    "openai": "openai",
+    "google": "google",
+    "meta-llama": "meta",
+    "mistralai": "mistral",
+    "deepseek": "deepseek",
+    "qwen": "qwen",
+    "cohere": "cohere",
+    "x-ai": "xai",
+}
+
+
 def model_family(model: str | None) -> str:
-    """Coarse model family used for the cross-family judge check."""
+    """Coarse model family used for the cross-family judge check.
+
+    OpenRouter slugs carry the vendor as a prefix (`anthropic/claude-sonnet-4.5`), which is used
+    directly. Bare ids fall back to name heuristics (`claude-*` -> anthropic, `gpt-*` -> openai).
+    """
     if not model:
         return "unknown"
-    m = model.lower()
+    m = model.lower().strip()
+    if "/" in m:
+        vendor = m.split("/", 1)[0]
+        return _VENDOR_ALIASES.get(vendor, vendor)
     if m.startswith("claude"):
         return "anthropic"
     if m.startswith(("gpt", "o1", "o3", "o4", "text-embedding", "chatgpt")):
@@ -77,6 +99,8 @@ def model_family(model: str | None) -> str:
         return "google"
     if m.startswith("fake"):
         return "fake"
+    if m.startswith("llama"):
+        return "meta"
     return m.split("-")[0]
 
 

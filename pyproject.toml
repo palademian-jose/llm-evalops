@@ -15,6 +15,7 @@ dependencies = [
     "typer>=0.12",
     "pyyaml>=6.0",
     "filelock>=3.13",
+    "openai>=3.31.0",
 ]
 
 [project.optional-dependencies]

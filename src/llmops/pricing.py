@@ -31,7 +31,7 @@ def pricing_path() -> Path:
 @lru_cache(maxsize=8)
 def _load(path: str) -> dict[str, Price]:
     raw = json.loads(Path(path).read_text(encoding="utf-8"))
-    return {k: Price(**v) for k, v in raw.items() if not k.startswith("_")}
+    return {k.lower(): Price(**v) for k, v in raw.items() if not k.startswith("_")}
 
 
 def load_pricing(path: str | os.PathLike[str] | None = None) -> dict[str, Price]:
@@ -44,16 +44,41 @@ def reset_pricing_cache() -> None:
     _load.cache_clear()
 
 
+def _variants(model: str) -> list[str]:
+    """Candidate keys for a model id, most specific first."""
+    m = model.lower().strip()
+    out = [m]
+    bare = m.split("/", 1)[1] if "/" in m else m
+    if bare != m:
+        out.append(bare)
+    for base in list(out):
+        # OpenRouter uses `claude-sonnet-4.5`; vendors use `claude-sonnet-4-5`. Accept both.
+        dashed = base.replace(".", "-")
+        dotted_head = base
+        if dashed not in out:
+            out.append(dashed)
+        if dotted_head not in out:
+            out.append(dotted_head)
+    return out
+
+
 def normalize_model(model: str, table: dict[str, Price] | None = None) -> str:
-    """Map dated/aliased model ids onto pricing keys (e.g. claude-sonnet-4-5-20250929)."""
-    m = model.lower()
+    """Map OpenRouter slugs, dated ids and aliases onto a pricing key.
+
+    Order: exact key > vendor prefix stripped > dots/dashes normalized > longest key that is a
+    prefix of the id (dated ids such as `claude-sonnet-4-5-20250929`). Returns the input when
+    nothing matches.
+    """
     table = table or load_pricing()
-    if m in table:
-        return m
-    candidates = [k for k in table if m.startswith(k)]
-    if candidates:
-        return max(candidates, key=len)
-    return m
+    variants = _variants(model)
+    for v in variants:
+        if v in table:
+            return v
+    for v in variants:
+        candidates = [k for k in table if v.startswith(k) and not k.startswith("fake")]
+        if candidates:
+            return max(candidates, key=len)
+    return model.lower().strip()
 
 
 def estimate_cost(
