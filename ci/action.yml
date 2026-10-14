@@ -1,0 +1,33 @@
+name: "evalkit gate"
+description: "Fail the job when an eval candidate regresses against a baseline under evals.yaml thresholds."
+inputs:
+  baseline:
+    description: "Baseline EvalResult JSON (e.g. reports/main.json)."
+    required: true
+  candidate:
+    description: "Candidate EvalResult JSON (e.g. reports/pr.json)."
+    required: true
+  config:
+    description: "Gate config (evals.yaml)."
+    required: false
+    default: "evals.yaml"
+  markdown:
+    description: "Where to write the gate table."
+    required: false
+    default: "reports/gate.md"
+runs:
+  using: "composite"
+  steps:
+    - name: Install uv
+      uses: astral-sh/setup-uv@v6
+    - name: Run the gate and annotate the job summary
+      shell: bash
+      env:
+        LLM_PROVIDER: fake
+      run: |
+        uv run evalkit gate \
+          --baseline "${{ inputs.baseline }}" \
+          --candidate "${{ inputs.candidate }}" \
+          --config "${{ inputs.config }}" \
+          --md "${{ inputs.markdown }}" \
+          --annotate

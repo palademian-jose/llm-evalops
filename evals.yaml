@@ -1,0 +1,10 @@
+# Gate thresholds consumed by `evalkit gate --config evals.yaml`.
+# Higher-is-better metrics: `min` (absolute floor) and `max_drop` (vs. baseline).
+# Lower-is-better metrics: `max` and `max_increase`.
+min_cases: 10
+metrics:
+  faithfulness: {min: 0.85, max_drop: 0.05}
+  recall_at_5: {min: 0.80, max_drop: 0.05}
+  answer_relevance: {min: 0.80, max_drop: 0.10}
+  exact_match: {max_drop: 0.10}
+  cost_usd_per_case: {max_increase: 0.002}

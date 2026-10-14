@@ -1,0 +1,70 @@
+# Reusable workflow: call it from a consumer repo (docs-rag, briefing-agent) like
+#
+#   jobs:
+#     gate:
+#       uses: ./.github/workflows/eval-gate.yml   # copy this file there, or reference it by path
+#       with:
+#         golden: evals/golden/rag.jsonl
+#         target: docs_rag.eval_target:answer
+#         metrics: recall_at_20,faithfulness,task_success
+#
+# It runs the candidate eval on the PR, downloads the baseline produced on main (artifact
+# `eval-baseline`), gates, and writes the table to the job summary.
+name: eval-gate
+
+on:
+  workflow_call:
+    inputs:
+      golden:
+        type: string
+        required: true
+      target:
+        type: string
+        required: true
+      metrics:
+        type: string
+        required: true
+      config:
+        type: string
+        default: evals.yaml
+      k:
+        type: number
+        default: 1
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    env:
+      LLM_PROVIDER: fake
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --all-extras
+      - name: Run candidate eval
+        run: |
+          uv run evalkit run --golden "${{ inputs.golden }}" --target "${{ inputs.target }}" \
+            --metrics "${{ inputs.metrics }}" --k ${{ inputs.k }} --out reports --run-id pr
+      - name: Download baseline from main
+        uses: dawidd6/action-download-artifact@v6
+        with:
+          workflow: ci.yml
+          branch: main
+          name: eval-baseline
+          path: reports/baseline
+          if_no_artifact_found: warn
+      - name: Gate
+        run: |
+          if [ -f reports/baseline/eval-main.json ]; then
+            uv run evalkit gate --baseline reports/baseline/eval-main.json \
+              --candidate reports/eval-pr.json --config "${{ inputs.config }}" \
+              --md reports/gate.md --annotate
+          else
+            echo "no baseline artifact; applying absolute thresholds only"
+            uv run evalkit gate --candidate reports/eval-pr.json --config "${{ inputs.config }}" \
+              --md reports/gate.md --annotate
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eval-reports
+          path: reports/
