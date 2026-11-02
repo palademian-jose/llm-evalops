@@ -247,8 +247,15 @@ def evaluate_rule(rule: RuleConfig, window: list[Span], baseline: list[Span]) ->
     if rule.feature:
         window = [s for s in window if s.feature == rule.feature]
         baseline = [s for s in baseline if s.feature == rule.feature]
-    row = CheckRow(rule=rule.name, type=rule.type, window_value=None, baseline_value=None,
-                   delta=None, threshold="", status="OK")
+    row = CheckRow(
+        rule=rule.name,
+        type=rule.type,
+        window_value=None,
+        baseline_value=None,
+        delta=None,
+        threshold="",
+        status="OK",
+    )
 
     if rule.type == "output_length_drift":
         cur, base = output_lengths(window), output_lengths(baseline)
@@ -264,7 +271,9 @@ def evaluate_rule(rule: RuleConfig, window: list[Span], baseline: list[Span]) ->
         shift = _pct_increase(med_b, med_c)
         row.baseline_value, row.window_value = med_b, med_c
         row.delta = med_c - med_b
-        row.detail = f"KS stat {ks.statistic:.3f}, p={ks.pvalue:.3g}, median {med_b:.0f}->{med_c:.0f}"
+        row.detail = (
+            f"KS stat {ks.statistic:.3f}, p={ks.pvalue:.3g}, median {med_b:.0f}->{med_c:.0f}"
+        )
         if ks.pvalue < p_lt and shift is not None and abs(shift) > rule.min_shift_pct:
             row.status = "VIOLATION"
         return row

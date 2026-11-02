@@ -86,7 +86,9 @@ def build_notifiers(configs: list[NotifierConfig], settings: Settings | None = N
     return out
 
 
-def notify(result: CheckResult, configs: list[NotifierConfig], settings: Settings | None = None) -> int:
+def notify(
+    result: CheckResult, configs: list[NotifierConfig], settings: Settings | None = None
+) -> int:
     """Send the result through every configured notifier; returns the number that succeeded."""
     sent = 0
     for n in build_notifiers(configs, settings):

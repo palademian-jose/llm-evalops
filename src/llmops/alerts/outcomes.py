@@ -39,7 +39,11 @@ def load_last_check(directory: str | Path | None = None) -> dict[str, Any] | Non
 
 
 def record_outcome(
-    outcome: bool, *, alert_id: str | None = None, note: str = "", directory: str | Path | None = None
+    outcome: bool,
+    *,
+    alert_id: str | None = None,
+    note: str = "",
+    directory: str | Path | None = None,
 ) -> int:
     last = load_last_check(directory)
     if not last or not last.get("violations"):
@@ -80,7 +84,10 @@ def precision_table(rows: list[dict[str, Any]]) -> str:
     agg: dict[str, list[int]] = defaultdict(lambda: [0, 0])
     for r in rows:
         agg[r["rule"]][0 if r["true_positive"] else 1] += 1
-    lines = ["| Rule | fired | true | false | precision | false-alarm rate |", "|---|---|---|---|---|---|"]
+    lines = [
+        "| Rule | fired | true | false | precision | false-alarm rate |",
+        "|---|---|---|---|---|---|",
+    ]
     tot_t = tot_f = 0
     for rule, (t, f) in sorted(agg.items()):
         n = t + f
@@ -89,7 +96,9 @@ def precision_table(rows: list[dict[str, Any]]) -> str:
         lines.append(f"| {rule} | {n} | {t} | {f} | {t / n:.0%} | {f / n:.0%} |")
     n = tot_t + tot_f
     if n:
-        lines.append(f"| **all** | {n} | {tot_t} | {tot_f} | **{tot_t / n:.0%}** | {tot_f / n:.0%} |")
+        lines.append(
+            f"| **all** | {n} | {tot_t} | {tot_f} | **{tot_t / n:.0%}** | {tot_f / n:.0%} |"
+        )
     else:
         lines.append("| (no outcomes recorded) | | | | | |")
     return "\n".join(lines)
