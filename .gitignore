@@ -12,9 +12,9 @@ dist/
 .env
 
 # Generated at runtime
-traces/
-reports/
-alerts/
+/traces/
+/reports/
+/alerts/
 evals/golden/*.jsonl
 !examples/**
 
